@@ -1,5 +1,6 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+K3S_TOKEN = "baa4662baa58335b2e3babf43cc53cfeee9a3ebd861b1c1dfc4732066f8c0d4c"
 
 # All Vagrant configuration is done below. The "2" in Vagrant.configure
 # configures the configuration version (we support older styles for
@@ -12,8 +13,12 @@ Vagrant.configure("2") do |config|
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
-  config.vm.hostname = "aharrassS"
-  config.vm.box = "debian/jessie64"
+  config.vm.hostname = "aharrass"
+  config.vm.box = "ubuntu-26.04-minimal-arm64"
+  config.vm.box_url = "./ubuntu-26.04-arm64.box"
+  config.vm.synced_folder ".", "/vagrant", disabled: true # Disable the default share of the current code directory. Doing this
+  # provides improved isolation between the vagrant box and your host
+  # by making sure your Vagrantfile isn't accessable to the vagrant box.
 
   # The url from where the 'config.vm.box' box will be fetched if it
   # doesn't already exist on the user's system.
@@ -32,7 +37,6 @@ Vagrant.configure("2") do |config|
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
-  config.vm.network "private_network", ip: "192.168.56.110"
 
   # Create a public network, which generally matched to bridged network.
   # Bridged networks make the machine appear as another physical device on
@@ -68,20 +72,14 @@ Vagrant.configure("2") do |config|
   # information on available options.
 
   config.vm.provider "libvirt" do |v|
-    v.memory = 1024
-    v.cpus = 1
+    v.cpu_mode = "host-passthrough"
     
 
     # Switch from KVM to QEMU emulation for nested VMs
-    v.driver = "qemu"
-    v.machine_type = "virt"
-    v.cpu_mode = "custom"
-    v.cpu_model = "cortex-a72"
+    v.driver = "kvm"
 
-    # Required for ARM64 (aarch64) guests
-    v.storage_pool_name = "home"                                  # VM disks + box image go to /home/libvirt/images
-    v.loader = "/usr/share/AAVMF/AAVMF_CODE.fd"
-    v.nvram = "/home/libvirt/nvram/p1_default_VARS.fd"            # later: one per machine (aharrassS_VARS.fd, aharrassSW_VARS.fd)
+    # Required for ARM64 (aarch64) guests                              # VM disks + box image go to /home/libvirt/images
+    v.loader = "/usr/share/AAVMF/AAVMF_CODE.fd"     # later: one per machine (aharrassS_VARS.fd, aharrassSW_VARS.fd)      # later: one per machine (aharrassS_VARS.fd, aharrassSW_VARS.fd)
 
     # Disable x86-specific defaults that fail on ARM64
     v.video_type = "virtio"
@@ -89,6 +87,27 @@ Vagrant.configure("2") do |config|
     v.input :type => "mouse", :bus => "virtio"
   end
 
+  config.vm.define "aharrassS" do |s|
+    s.vm.hostname = "aharrassS"
+    s.vm.network "private_network", ip: "192.168.56.110"
+    s.vm.provider "libvirt" do |v|
+        v.memory = 2048
+        v.cpus = 1
+        v.nvram = "/var/lib/libvirt/qemu/nvram/aharrassS_VARS.fd" 
+    end
+    s.vm.provision "shell", path: "scripts/server.sh", env: { "K3S_TOKEN" => K3S_TOKEN }
+  end
+
+  config.vm.define "aharrassSW" do |s|
+    s.vm.hostname = "aharrassSW"
+    s.vm.network "private_network", ip: "192.168.56.111"
+    s.vm.provider "libvirt" do |v|
+        v.memory = 1024
+        v.cpus = 1
+        v.nvram = "/var/lib/libvirt/qemu/nvram/aharrassSW_VARS.fd" 
+    end
+    s.vm.provision "shell", path: "scripts/worker.sh", env: { "K3S_TOKEN" => K3S_TOKEN }
+  end
   # Enable provisioning with a shell script. Additional provisioners such as
   # Ansible, Chef, Docker, Puppet and Salt are also available. Please see the
   # documentation for more information about their specific syntax and use.
